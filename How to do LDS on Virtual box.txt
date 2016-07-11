@@ -1,0 +1,92 @@
+How to Do LFS on Virtual box
+
+1> we need a running Linux virtual box instance.
+2> on Setting -> Storage -> SATA , adding a new disk.
+
+once new disk created and attached to Linux instance, boot up the Linux instance.
+issue lsblk coomand , you will see something like below:
+
+
+NAME                   MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda                      8:0    0   40G  0 disk
+├─sda1                   8:1    0  487M  0 part /boot
+├─sda2                   8:2    0    1K  0 part
+└─sda5                   8:5    0 39.5G  0 part
+  ├─vagrant--vg-root   252:0    0 35.5G  0 lvm  /
+  └─vagrant--vg-swap_1 252:1    0    4G  0 lvm  [SWAP]
+sdb                      8:16   0   50G  0 disk
+
+our new disk is sdb,We will be using fdisk for partitioning the sdb disk.
+
+issue , sudo fdisk /dev/sdb
+
+first we have to create an extended partition
+
+Welcome to fdisk (util-linux 2.27.1).
+Changes will remain in memory only, until you decide to write them.
+Be careful before using the write command.
+
+
+Command (m for help):
+
+Enter ‘n’ to create a new partition.
+Enter ‘e’ for partition type. 
+Enter ‘1’ for partition number.
+Accept the default for first sector.
+Enter ‘+40G’ for the last sector.
+
+Now, we have created an extended partition, we need to create 4 logic partitions on it.
+each partion is 10G, 10G, 5G, 10G
+
+Finally we will add partitions for the swap and boot partitions.
+new, we need to create 2 primay partions.
+
+Enter ‘n’ to create a new partition.
+Enter ‘p’ for primary.
+Accept the default for first sector and partition number.
+For last sector enter ‘+2G’
+
+Enter ‘n’ to create a new partition.
+Enter ‘p’ for primary.
+Accept the default for first sector and partition number.
+For last sector enter ‘+100M’
+
+lsblk, you see following output,
+
+NAME                   MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+sda                      8:0    0   40G  0 disk
+├─sda1                   8:1    0  487M  0 part /boot
+├─sda2                   8:2    0    1K  0 part
+└─sda5                   8:5    0 39.5G  0 part
+  ├─vagrant--vg-root   252:0    0 35.5G  0 lvm  /
+  └─vagrant--vg-swap_1 252:1    0    4G  0 lvm  [SWAP]
+sdb                      8:16   0   50G  0 disk
+├─sdb1                   8:17   0    1K  0 part
+├─sdb2                   8:18   0    2G  0 part
+├─sdb3                   8:19   0  100M  0 part /mnt/lfs/boot
+├─sdb5                   8:21   0   10G  0 part /mnt/lfs
+├─sdb6                   8:22   0   10G  0 part /mnt/lfs/home
+├─sdb7                   8:23   0    5G  0 part /mnt/lfs/usr
+└─sdb8                   8:24   0   10G  0 part /mnt/lfs/opt
+
+Create filesystem on above newly created partitions:
+
+sudo mkfs -v -t ext4 /dev/sdb7 -L usr 
+sudo mkfs -v -t ext4 /dev/sdb3 -L boot
+sudo mkfs -v -t ext4 /dev/sdb5 -L root
+sudo mkfs -v -t ext4 /dev/sdb6 -L home
+sudo mkfs -v -t ext4 /dev/sdb8 -L opt
+sudo mkswap /dev/sdb2 -L swap
+
+finally , put following command into /etc/fstab
+
+/dev/sdb5 /mnt/lfs ext4 rw,relatime,data=ordered 0 0
+/dev/sdb7 /mnt/lfs/usr ext4 rw,relatime,data=ordered 0 0
+/dev/sdb3 /mnt/lfs/boot ext4 rw,relatime,data=ordered 0 0
+/dev/sdb6 /mnt/lfs/home ext4 rw,relatime,data=ordered 0 0
+/dev/sdb8 /mnt/lfs/opt ext4 rw,relatime,data=ordered 0 0
+
+restart Linux, and ls /mnt/lfs , produce following output:
+
+boot  home  lost+found  opt  usr
+
